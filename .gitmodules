@@ -1,0 +1,15 @@
+[submodule "Carthage/Checkouts/CocoaAsyncSocket"]
+	path = Carthage/Checkouts/CocoaAsyncSocket
+	url = https://github.com/robbiehanson/CocoaAsyncSocket.git
+[submodule "Carthage/Checkouts/CocoaMQTT"]
+	path = Carthage/Checkouts/CocoaMQTT
+	url = https://github.com/emqtt/CocoaMQTT.git
+[submodule "Carthage/Checkouts/MSWeakTimer"]
+	path = Carthage/Checkouts/MSWeakTimer
+	url = https://github.com/mindsnacks/MSWeakTimer.git
+[submodule "Carthage/Checkouts/Nimble"]
+	path = Carthage/Checkouts/Nimble
+	url = https://github.com/Quick/Nimble.git
+[submodule "Carthage/Checkouts/Quick"]
+	path = Carthage/Checkouts/Quick
+	url = https://github.com/Quick/Quick.git
