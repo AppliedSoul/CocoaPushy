@@ -1,0 +1,3 @@
+github "robbiehanson/CocoaAsyncSocket" >= 7.5.1
+github "mindsnacks/MSWeakTimer" "master"
+github "emqtt/CocoaMQTT" >= 1.0.11
