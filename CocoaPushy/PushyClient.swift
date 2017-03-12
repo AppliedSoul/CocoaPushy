@@ -31,6 +31,7 @@ import Foundation
 import CocoaMQTT
 import SystemConfiguration
 import CoreData
+import UIKit
 
 
 /*
@@ -365,31 +366,39 @@ fileprivate extension NetworkAvailability {
  */
 
 
+
 public struct PushyConf{
     fileprivate let host:String
     fileprivate let port:UInt16
+    fileprivate let regUrl:String
     fileprivate let deviceId:String
     fileprivate let clientId:String
+    fileprivate let langType:UInt8
     fileprivate let user:String?
     fileprivate let pass:String?
     fileprivate let isSSL:Bool
     fileprivate let certName:String?
     fileprivate let certPass:String?
+
     
-    public init(host:String,port:UInt16,deviceId:String,clientId client:String,
+    public init(host:String,port:UInt16,registrationUrl regUrl:String,deviceId:String,
+                clientId client:String, langType:UInt8 = 1,
          user:String? = nil,password pass:String? = nil,
          isSSL:Bool=false,certificateName certName:String? = nil,
          certificatePassword certPass:String? = nil){
         
         self.host       = host;
         self.port       = port;
+        self.regUrl     = regUrl;
         self.deviceId   = deviceId;
         self.clientId   = client;
+        self.langType   = langType;
         self.user       = user;
         self.pass       = pass;
         self.isSSL      = isSSL;
         self.certName   = certName;
         self.certPass   = certPass;
+
         
     }
 }
@@ -473,7 +482,7 @@ class MqttClient {
         
         
     }
-    
+/*
     convenience init(networkMonitor:NetworkAvailability,host:String,port:UInt16,deviceId:String,clientId client:String,
                      user:String?=nil,password pass:String?=nil,
                      isSSL:Bool=false)  {
@@ -481,7 +490,7 @@ class MqttClient {
         self.init(config: PushyConf(host:host,port:port,deviceId:deviceId,clientId:client,
                                     user:user, password:pass,isSSL: isSSL), networkMonitor: networkMonitor)
     }
-    
+*/
     @discardableResult
     private func validateUrl(url:String) throws ->Bool?{
         if (url.hasPrefix("tcp://") || url.hasPrefix("ssl://") ||
@@ -808,7 +817,8 @@ public class PushyClient{
     
     private let notificationCenter = NotificationCenter.default
  
-    fileprivate let urlSuffix = "/api/ios/device"
+    fileprivate let urlSuffix = "/api/secured/device"
+    
     
     fileprivate let conf:PushyConf
     
@@ -817,35 +827,56 @@ public class PushyClient{
     /// Topic prefix for all subscribed topics
     private let notificationPrefix = "/earlydata/pushy"
     
-    private let pushSvc:MqttClient
+    //private let pushSvc:MqttClient
+    
     
     private func notificationTopic(clientId:String)->String{
         return "\(self.notificationPrefix)\(clientId)/notify/#"
     }
+    public func registerPushNotifications() {
+        DispatchQueue.main.async {
+            let settings = UIUserNotificationSettings(types: [.badge, .sound, .alert], categories: nil)
+            UIApplication.shared.registerUserNotificationSettings(settings)
+        }
+    }
     
-    public init(config conf:PushyConf) throws {
-        self.conf = conf
+    
+    public init(/*config conf:PushyConf*/) throws {
+        //self.conf = conf
+        if let path = Bundle.main.path(forResource: "Pushy", ofType: "plist"),
+        let dict = NSDictionary(contentsOfFile: path) as? [String: AnyObject] {
+            // use swift dictionary as normal
+            let appId = dict["appKey"] as! String
+            let appSecret = dict["appSecret"] as! String
+            let regUrl = dict["registrationUrl"] as! String
+            
+            self.conf = PushyConf(host: regUrl, port: 1883, registrationUrl: regUrl, deviceId: "", clientId: "",langType:1,user: appId, password: appSecret)
+        }else{
+            throw PushyError.mqttConfigError(reason: "Pushy.plist incorrectly defined.")
+        }
+
+        
         do{
             try networkMonitor.startNotifier()
         }catch{
             Logger.log("Unable to start network notifier")
         }
         
-        pushSvc = MqttClient(config: conf,networkMonitor:networkMonitor)
-        unowned let that = self
-        pushSvc.messageCallback = that.handleMessage
-        pushSvc.subscribe(topic: notificationTopic(clientId: conf.clientId))
+//        pushSvc = MqttClient(config: conf,networkMonitor:networkMonitor)
+//        unowned let that = self
+//        pushSvc.messageCallback = that.handleMessage
+//        pushSvc.subscribe(topic: notificationTopic(clientId: conf.clientId))
         
-        try doUpdateDeviceId(deviceId: conf.deviceId, clientId: conf.clientId, host: conf.host)
+//        try doUpdateDeviceId(deviceId: conf.deviceId, clientId: conf.clientId, host: conf.host)
         
-        pushSvc.connect()
+//        pushSvc.connect()
         
     }
     
     public func updateClientDevice(deviceId:String, clientId:String){
         try? self.doUpdateDeviceId(deviceId: deviceId, clientId: clientId, host: conf.host)
     }
-    
+    /*
     public func subscribe(topic: String){
         pushSvc.subscribe(topic: topic)
     }
@@ -862,7 +893,7 @@ public class PushyClient{
     public func unsubscribe(clientId: String){
         pushSvc.unsubscribe(topic: notificationTopic(clientId: clientId))
     }
-    
+    */
     @objc private func fireUpdateWhenNotified(notification:NSNotification){
         
         if let payload = notification.object as? (deviceId:String,clientId:String,host:String){
@@ -914,6 +945,21 @@ public class PushyClient{
     
 }
 
+fileprivate extension String {
+    
+    func fromBase64() -> String? {
+        guard let data = Data(base64Encoded: self) else {
+            return nil
+        }
+        
+        return String(data: data, encoding: .utf8)
+    }
+    
+    func toBase64() -> String {
+        return Data(self.utf8).base64EncodedString()
+    }
+}
+
 extension PushyClient{
     enum Status{
                 case success
@@ -922,8 +968,8 @@ extension PushyClient{
         }
     
     func updateDeviceId(deviceId:String,clientId:String,host:String, callback:@escaping (PushyClient.Status)->Void) throws{
-        let scheme = conf.isSSL ? "https":"http"
-        guard let connUrl =  URL(string: "\(scheme)://\(host)/\(self.urlSuffix)") else{
+        //let scheme = conf.isSSL ? "https":"http"
+        guard let connUrl =  URL(string: conf.regUrl) else { //URL(string: "\(scheme)://\(host)/\(self.urlSuffix)") else{
             
             throw PushyError.malformedUrl(reason: "\(host) is invalid")
         }
@@ -932,12 +978,13 @@ extension PushyClient{
             callback(.down)
         }else{
             var request = URLRequest(url: connUrl, cachePolicy: URLRequest.CachePolicy.reloadIgnoringCacheData, timeoutInterval:TimeInterval(120))
-            let payload:[String: Any] = ["clientId": clientId, "deviceId": deviceId, "appKey":self.conf.user ?? "", "appSecret": self.conf.pass ?? ""]
+            let payload:[String: Any] = ["clientId": clientId, "deviceId": deviceId, "appId":self.conf.user ?? "x","osType":2, "langType":1]
             let payloadJson = try! JSONSerialization.data(withJSONObject: payload)
     
             request.httpMethod = "POST"
             request.httpBody = payloadJson
             request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.addValue("\(self.conf.user ?? ""):\(self.conf.pass ?? "")".toBase64(), forHTTPHeaderField: "PSY-CLIENT-TOKEN")
             
             let task = URLSession.shared.dataTask(with: request){
                 data,response,error in
