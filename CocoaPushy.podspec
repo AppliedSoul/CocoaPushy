@@ -7,7 +7,7 @@ Pod::Spec.new do |spec|
   spec.authors = { "Noel Gaur" => 'noel.gaur@qq.com' }
   spec.social_media_url = "http://facebook.com/noelgaur"
 
-  spec.platform = :ios, "10"
+  spec.platform = :ios, "9.3"
   spec.requires_arc = true
   spec.source = { git: "https://github.com/AppliedSoul/CocoaPushy.git", tag: "v#{spec.version}", submodules: true }
   spec.source_files = "CocoaPushy/**/*.{h,swift}"
