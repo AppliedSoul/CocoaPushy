@@ -811,7 +811,7 @@ public struct PushyMessage{
     }
 }
 
-public class PushyClient{
+public class PushyClient:NSObject{
     
     fileprivate let networkMonitor = NetworkAvailability()!
     
@@ -820,7 +820,7 @@ public class PushyClient{
     fileprivate let urlSuffix = "/api/secured/device"
     
     
-    fileprivate let conf:PushyConf
+    fileprivate var conf:PushyConf!
     
     private var hasNetworkObserver = false
     
@@ -841,8 +841,9 @@ public class PushyClient{
     }
     
     
-    public init(/*config conf:PushyConf*/) throws {
+    public override init(/*config conf:PushyConf*/) {
         //self.conf = conf
+        super.init();
         if let path = Bundle.main.path(forResource: "Pushy", ofType: "plist"),
         let dict = NSDictionary(contentsOfFile: path) as? [String: AnyObject] {
             // use swift dictionary as normal
@@ -852,7 +853,7 @@ public class PushyClient{
             
             self.conf = PushyConf(host: regUrl, port: 1883, registrationUrl: regUrl, deviceId: "", clientId: "",langType:1,user: appId, password: appSecret)
         }else{
-            throw PushyError.mqttConfigError(reason: "Pushy.plist incorrectly defined.")
+            self._console("Pushy.plist incorrectly defined.")
         }
 
         
